@@ -11,6 +11,102 @@ const {
     deleteStudent
 } = require("../models/studentModel");
 
+const validateStudentFields = ({
+    registrationNo,
+    firstName,
+    lastName,
+    email,
+    phoneNumber
+}) => {
+    const errors = {};
+    const registration = typeof registrationNo === "string"
+        ? registrationNo.trim()
+        : "";
+    const first = typeof firstName === "string"
+        ? firstName.trim()
+        : "";
+    const last = typeof lastName === "string"
+        ? lastName.trim()
+        : "";
+    const emailAddress = typeof email === "string"
+        ? email.trim()
+        : "";
+    const phone = typeof phoneNumber === "string"
+        ? phoneNumber.trim()
+        : "";
+
+    if (!registration) {
+        errors.registrationNo = "Registration number is required.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9_-]+)*$/.test(registration)) {
+        errors.registrationNo = "Registration number must contain only letters, numbers, hyphens, underscores, or slashes.";
+    } else if (registration.length > 50) {
+        errors.registrationNo = "Registration number must not exceed 50 characters.";
+    }
+
+    if (!first) {
+        errors.firstName = "First name is required.";
+    } else if (first.length < 3) {
+        errors.firstName = "First name must contain at least 3 characters.";
+    } else if (!/^\p{L}+$/u.test(first)) {
+        errors.firstName = "First name must contain alphabetic characters only.";
+    }
+
+    if (!last) {
+        errors.lastName = "Last name is required.";
+    } else if (last.length < 3) {
+        errors.lastName = "Last name must contain at least 3 characters.";
+    } else if (!/^\p{L}+$/u.test(last)) {
+        errors.lastName = "Last name must contain alphabetic characters only.";
+    }
+
+    if (!emailAddress) {
+        errors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailAddress)) {
+        errors.email = "Enter a valid email address.";
+    }
+
+    if (!phone) {
+        errors.phoneNumber = "Phone number is required.";
+    } else if (!/^\d+$/.test(phone)) {
+        errors.phoneNumber = "Phone number must contain numeric characters only.";
+    } else if (phone.length !== 10) {
+        errors.phoneNumber = "Phone number must contain exactly 10 digits.";
+    }
+
+    return {
+        errors,
+        values: {
+            registrationNo: registration,
+            firstName: first,
+            lastName: last,
+            email: emailAddress,
+            phoneNumber: phone
+        }
+    };
+};
+
+const validatePassword = (password) => {
+    if (typeof password !== "string" || password.length === 0) {
+        return "Password is required.";
+    }
+    if (password.length < 8) {
+        return "Password must contain at least 8 characters.";
+    }
+    if (!/[A-Z]/.test(password)) {
+        return "Password must contain at least one uppercase letter.";
+    }
+    if (!/[a-z]/.test(password)) {
+        return "Password must contain at least one lowercase letter.";
+    }
+    if (!/\d/.test(password)) {
+        return "Password must contain at least one number.";
+    }
+    if (!/[^A-Za-z0-9\s]/.test(password)) {
+        return "Password must contain at least one special character.";
+    }
+    return "";
+};
+
 
 // CREATE STUDENT
 const addStudent = async (req, res) => {
@@ -28,21 +124,28 @@ const addStudent = async (req, res) => {
 
     try {
 
-        // Validate required fields
-        if (
-            !registrationNo ||
-            !firstName ||
-            !lastName ||
-            !email ||
-            !phoneNumber ||
-            !password
-        ) {
+        const validation = validateStudentFields({
+            registrationNo,
+            firstName,
+            lastName,
+            email,
+            phoneNumber
+        });
 
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            validation.errors.password = passwordError;
+        }
+
+        if (Object.keys(validation.errors).length > 0) {
             return res.status(400).json({
                 success: false,
-                message: "All student fields and password are required"
+                message: "Please correct the highlighted fields.",
+                fieldErrors: validation.errors
             });
         }
+
+        const studentData = validation.values;
 
 
         // Get database connection
@@ -59,7 +162,7 @@ const addStudent = async (req, res) => {
              FROM users
              WHERE username = ?
              LIMIT 1`,
-            [registrationNo]
+            [studentData.registrationNo]
         );
 
         if (existingUser.length > 0) {
@@ -79,7 +182,7 @@ const addStudent = async (req, res) => {
              FROM students
              WHERE email = ?
              LIMIT 1`,
-            [email]
+            [studentData.email]
         );
 
         if (existingStudent.length > 0) {
@@ -107,7 +210,7 @@ const addStudent = async (req, res) => {
             )
             VALUES (?, ?, 'STUDENT')`,
             [
-                registrationNo,
+                studentData.registrationNo,
                 passwordHash
             ]
         );
@@ -119,11 +222,11 @@ const addStudent = async (req, res) => {
         const studentId = await createStudent(
             connection,
             userId,
-            registrationNo,
-            firstName,
-            lastName,
-            email,
-            phoneNumber
+            studentData.registrationNo,
+            studentData.firstName,
+            studentData.lastName,
+            studentData.email,
+            studentData.phoneNumber
         );
 
 
@@ -138,11 +241,11 @@ const addStudent = async (req, res) => {
             student: {
                 studentId,
                 userId,
-                registrationNo,
-                firstName,
-                lastName,
-                email,
-                phoneNumber,
+                registrationNo: studentData.registrationNo,
+                firstName: studentData.firstName,
+                lastName: studentData.lastName,
+                email: studentData.email,
+                phoneNumber: studentData.phoneNumber,
                 role: "STUDENT"
             }
         });
@@ -267,20 +370,23 @@ const editStudent = async (req, res) => {
         } = req.body;
 
 
-        // Validate input
-        if (
-            !registrationNo ||
-            !firstName ||
-            !lastName ||
-            !email ||
-            !phoneNumber
-        ) {
+        const validation = validateStudentFields({
+            registrationNo,
+            firstName,
+            lastName,
+            email,
+            phoneNumber
+        });
 
+        if (Object.keys(validation.errors).length > 0) {
             return res.status(400).json({
                 success: false,
-                message: "All student fields are required"
+                message: "Please correct the highlighted fields.",
+                fieldErrors: validation.errors
             });
         }
+
+        const studentData = validation.values;
 
 
         // Check student exists
@@ -303,7 +409,7 @@ const editStudent = async (req, res) => {
              AND user_id != ?
              LIMIT 1`,
             [
-                registrationNo,
+                studentData.registrationNo,
                 existingStudent.user_id
             ]
         );
@@ -325,7 +431,7 @@ const editStudent = async (req, res) => {
              AND student_id != ?
              LIMIT 1`,
             [
-                email,
+                studentData.email,
                 studentId
             ]
         );
@@ -342,11 +448,12 @@ const editStudent = async (req, res) => {
         // Update student
         const result = await updateStudent(
             studentId,
-            registrationNo,
-            firstName,
-            lastName,
-            email,
-            phoneNumber
+            existingStudent.user_id,
+            studentData.registrationNo,
+            studentData.firstName,
+            studentData.lastName,
+            studentData.email,
+            studentData.phoneNumber
         );
 
 

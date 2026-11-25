@@ -85,33 +85,52 @@ const getStudentById = async (studentId) => {
 // UPDATE STUDENT
 const updateStudent = async (
     studentId,
+    userId,
     registrationNo,
     firstName,
     lastName,
     email,
     phoneNumber
 ) => {
+    const connection = await pool.getConnection();
 
-    const [result] = await pool.execute(
-        `UPDATE students
-        SET
-            registration_no = ?,
-            first_name = ?,
-            last_name = ?,
-            email = ?,
-            phone_number = ?
-        WHERE student_id = ?`,
-        [
-            registrationNo,
-            firstName,
-            lastName,
-            email,
-            phoneNumber,
-            studentId
-        ]
-    );
+    try {
+        await connection.beginTransaction();
 
-    return result;
+        await connection.execute(
+            `UPDATE users
+             SET username = ?
+             WHERE user_id = ?`,
+            [registrationNo, userId]
+        );
+
+        const [result] = await connection.execute(
+            `UPDATE students
+            SET
+                registration_no = ?,
+                first_name = ?,
+                last_name = ?,
+                email = ?,
+                phone_number = ?
+            WHERE student_id = ?`,
+            [
+                registrationNo,
+                firstName,
+                lastName,
+                email,
+                phoneNumber,
+                studentId
+            ]
+        );
+
+        await connection.commit();
+        return result;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 };
 
 

@@ -27,6 +27,7 @@ function StudentFormModal({
 
     const [formLoading, setFormLoading] = useState(false);
     const [formError, setFormError] = useState("");
+    const [fieldErrors, setFieldErrors] = useState({});
     const [showPassword, setShowPassword] = useState(false);
 
     // Reset form when editingStudent changes or modal opens
@@ -48,6 +49,7 @@ function StudentFormModal({
         }
 
         setFormError("");
+        setFieldErrors({});
     }, [editingStudent, show]);
 
     // Handle Input Changes
@@ -58,6 +60,78 @@ function StudentFormModal({
             ...previous,
             [name]: value
         }));
+
+        setFieldErrors(previous => ({
+            ...previous,
+            [name]: ""
+        }));
+    };
+
+    const validateForm = () => {
+        const errors = {};
+        const registrationNo = formData.registrationNo.trim();
+        const firstName = formData.firstName.trim();
+        const lastName = formData.lastName.trim();
+        const email = formData.email.trim();
+        const phoneNumber = formData.phoneNumber.trim();
+
+        if (!registrationNo) {
+            errors.registrationNo = "Registration number is required.";
+        } else if (!/^[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9_-]+)*$/.test(registrationNo)) {
+            errors.registrationNo = "Registration number must contain only letters, numbers, hyphens, underscores, or slashes.";
+        } else if (registrationNo.length > 50) {
+            errors.registrationNo = "Registration number must not exceed 50 characters.";
+        }
+
+        if (!firstName) {
+            errors.firstName = "First name is required.";
+        } else if (firstName.length < 3) {
+            errors.firstName = "First name must contain at least 3 characters.";
+        } else if (!/^\p{L}+$/u.test(firstName)) {
+            errors.firstName = "First name must contain alphabetic characters only.";
+        }
+
+        if (!lastName) {
+            errors.lastName = "Last name is required.";
+        } else if (lastName.length < 3) {
+            errors.lastName = "Last name must contain at least 3 characters.";
+        } else if (!/^\p{L}+$/u.test(lastName)) {
+            errors.lastName = "Last name must contain alphabetic characters only.";
+        }
+
+        if (!email) {
+            errors.email = "Email address is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            errors.email = "Enter a valid email address.";
+        }
+
+        if (!phoneNumber) {
+            errors.phoneNumber = "Phone number is required.";
+        } else if (!/^\d+$/.test(phoneNumber)) {
+            errors.phoneNumber = "Phone number must contain numeric characters only.";
+        } else if (phoneNumber.length !== 10) {
+            errors.phoneNumber = "Phone number must contain exactly 10 digits.";
+        }
+
+        if (!editingStudent) {
+            const password = formData.password;
+
+            if (!password) {
+                errors.password = "Password is required.";
+            } else if (password.length < 8) {
+                errors.password = "Password must contain at least 8 characters.";
+            } else if (!/[A-Z]/.test(password)) {
+                errors.password = "Password must contain at least one uppercase letter.";
+            } else if (!/[a-z]/.test(password)) {
+                errors.password = "Password must contain at least one lowercase letter.";
+            } else if (!/\d/.test(password)) {
+                errors.password = "Password must contain at least one number.";
+            } else if (!/[^A-Za-z0-9\s]/.test(password)) {
+                errors.password = "Password must contain at least one special character.";
+            }
+        }
+
+        return errors;
     };
 
 
@@ -65,6 +139,7 @@ function StudentFormModal({
     const handleClose = () => {
         if (formLoading) return;
         setFormError("");
+        setFieldErrors({});
         setShowPassword(false);
         onClose();
     };
@@ -75,6 +150,15 @@ function StudentFormModal({
         event.preventDefault();
 
         setFormError("");
+        setFieldErrors({});
+
+        const errors = validateForm();
+
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            setFormError("Please correct the highlighted fields.");
+            return;
+        }
 
         try {
             setFormLoading(true);
@@ -128,6 +212,14 @@ function StudentFormModal({
                 return;
             }
 
+            if (error.data?.fieldErrors) {
+                setFieldErrors(error.data.fieldErrors);
+                setFormError(
+                    error.message || "Please correct the highlighted fields."
+                );
+                return;
+            }
+
             setFormError(
                 error.message || "Failed to save student."
             );
@@ -158,7 +250,23 @@ function StudentFormModal({
                 onChange={handleInputChange}
                 disabled={formLoading}
                 required
+                {...(name === "phoneNumber"
+                    ? { inputMode: "numeric" }
+                    : {})}
+                aria-invalid={Boolean(fieldErrors[name])}
+                aria-describedby={
+                    fieldErrors[name] ? `${name}-error` : undefined
+                }
             />
+
+            {fieldErrors[name] && (
+                <span
+                    id={`${name}-error`}
+                    className="field-error"
+                >
+                    {fieldErrors[name]}
+                </span>
+            )}
 
         </div>
     );
@@ -263,6 +371,12 @@ function StudentFormModal({
                                     onChange={handleInputChange}
                                     disabled={formLoading}
                                     required
+                                    aria-invalid={Boolean(fieldErrors.password)}
+                                    aria-describedby={
+                                        fieldErrors.password
+                                            ? "password-error"
+                                            : "password-policy"
+                                    }
                                 />
 
                                 <button
@@ -285,6 +399,18 @@ function StudentFormModal({
                                     }
                                 </button>
                             </div>
+                            {fieldErrors.password && (
+                                <span
+                                    id="password-error"
+                                    className="field-error"
+                                >
+                                    {fieldErrors.password}
+                                </span>
+                            )}
+                            <small id="password-policy" className="field-hint">
+                                8+ characters with uppercase, lowercase, number,
+                                and special character.
+                            </small>
                         </div>
                     )}
 

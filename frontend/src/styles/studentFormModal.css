@@ -173,6 +173,26 @@
         0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+.student-form .form-group input[aria-invalid="true"] {
+    border-color: #dc2626;
+}
+
+.student-form .form-group input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.field-error {
+    color: #b91c1c;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.field-hint {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 .student-password-input-wrapper {
     position: relative;
 }
